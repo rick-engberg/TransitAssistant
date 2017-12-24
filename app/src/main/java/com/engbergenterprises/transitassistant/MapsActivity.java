@@ -15,6 +15,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import org.json.JSONArray;
@@ -29,6 +30,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private ProgressBar mLoadingIndicator;
     private EditText mSearchBoxEditText;
     private String busQueryResponse;
+    private Marker busMarker;
 
 
     @Override
@@ -60,26 +62,47 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         // Add a marker in Sydney and move the camera
         LatLng sydney = new LatLng(-34, 151);
         LatLng eastCarsonBirminghamBridge = new LatLng(40.4284087647783,-79.97431994499044);
-        mMap.addMarker(new MarkerOptions().position(eastCarsonBirminghamBridge).title("East Carson St @ Birmingham Bridge"));
+        busMarker = mMap.addMarker(new MarkerOptions().position(eastCarsonBirminghamBridge).title("East Carson St @ Birmingham Bridge"));
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(eastCarsonBirminghamBridge,15));
         mMap.animateCamera(CameraUpdateFactory.zoomIn());
         mMap.animateCamera(CameraUpdateFactory.zoomTo(15),2000,null);
     }
 
-    public void showPosition(View view) {
+    public void getBusPosition(View view) {
         String busQuery = mSearchBoxEditText.getText().toString();
         URL busSearchURL = NetworkUtils.buildUrl(busQuery);
         new BusQueryTask().execute(busSearchURL);
-        LatLng sydney = new LatLng(getLat(busQueryResponse),getLon(busQueryResponse));
+    }
+
+    public void updateMap() {
         // Check if no view has focus:
+        View view = this.getCurrentFocus();
         if (view != null) {
             InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
             imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
         }
-        mMap.addMarker(new MarkerOptions().position(sydney).title("51c"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(sydney,15));
+        LatLng busPosition = new LatLng(getLat(busQueryResponse),getLon(busQueryResponse));
+        busMarker.setPosition(busPosition);
+        busMarker.setTitle(getMarkerTitle(busQueryResponse));
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(busPosition,15));
         mMap.animateCamera(CameraUpdateFactory.zoomIn());
         mMap.animateCamera(CameraUpdateFactory.zoomTo(15),2000,null);
+    }
+
+    public String getMarkerTitle(String busQueryResponse) {
+        try {
+            JSONObject main = new JSONObject(busQueryResponse);
+            JSONObject busTimeResponse = main.getJSONObject("bustime-response");
+            JSONArray vehicles = busTimeResponse.getJSONArray("vehicle");
+            JSONObject bus = (JSONObject) vehicles.get(0);
+            String vid = bus.getString("vid");
+            String rt = bus.getString("rt");
+            return "Route = "+rt+", VID="+vid;
+        } catch (Exception e) {
+            Log.e("Exception",e.getMessage());
+            return "error";
+        }
+
     }
 
     public double getLat(String busQueryResponse) {
@@ -147,6 +170,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             mLoadingIndicator.setVisibility(View.INVISIBLE);
             if (busSearchResults != null && !busSearchResults.equals("")) {
                 busQueryResponse = busSearchResults;
+                updateMap();
             } else {
                 //showErrorMessage();
             }
