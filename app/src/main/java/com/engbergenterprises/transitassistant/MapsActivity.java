@@ -2,6 +2,7 @@ package com.engbergenterprises.transitassistant;
 
 import android.content.Context;
 import android.os.AsyncTask;
+import android.os.Handler;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -9,6 +10,7 @@ import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
@@ -23,6 +25,7 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.Locale;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
 
@@ -31,6 +34,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private EditText mSearchBoxEditText;
     private String busQueryResponse;
     private Marker busMarker;
+    static boolean primed = false;
+    private long updates = 0;
 
 
     @Override
@@ -44,6 +49,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mLoadingIndicator = (ProgressBar) findViewById(R.id.pb_loading_indicator);
         mSearchBoxEditText = (EditText) findViewById(R.id.et_search_box);
     }
+// NEW CODE START**
+    private void updatePositionHandler() {
+        Log.d("***DEBUG***","updatePositionHandler started");
+        final GoogleMap mMapUp = mMap;
+        final Handler handler = new Handler();
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+            getBusPosition(null);
+            updateMap();
+            handler.postDelayed(this, 60000);
+            }
+        });    }
+// NEW CODE **END
 
 
     /**
@@ -72,6 +91,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         String busQuery = mSearchBoxEditText.getText().toString();
         URL busSearchURL = NetworkUtils.buildUrl(busQuery);
         new BusQueryTask().execute(busSearchURL);
+        if (!primed) {
+            updatePositionHandler();
+            primed = true;
+        }
     }
 
     public void updateMap() {
@@ -84,9 +107,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         LatLng busPosition = new LatLng(getLat(busQueryResponse),getLon(busQueryResponse));
         busMarker.setPosition(busPosition);
         busMarker.setTitle(getMarkerTitle(busQueryResponse));
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(busPosition,15));
-        mMap.animateCamera(CameraUpdateFactory.zoomIn());
-        mMap.animateCamera(CameraUpdateFactory.zoomTo(15),2000,null);
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(busPosition));
+        //mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(busPosition,15));
+        //mMap.animateCamera(CameraUpdateFactory.zoomIn());
+        //mMap.animateCamera(CameraUpdateFactory.zoomTo(15),2000,null);
     }
 
     public String getMarkerTitle(String busQueryResponse) {
@@ -97,7 +121,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             JSONObject bus = (JSONObject) vehicles.get(0);
             String vid = bus.getString("vid");
             String rt = bus.getString("rt");
-            return "Route = "+rt+", VID="+vid;
+            return "Route = "+rt+", VID="+vid+", updates="+updates++;
         } catch (Exception e) {
             Log.e("Exception",e.getMessage());
             return "error";
