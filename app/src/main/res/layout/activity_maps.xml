@@ -12,11 +12,24 @@
         android:textSize="22sp" />
 
     <Button
-        android:id="@+id/searchButton"
+        android:id="@+id/searchInboundButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:onClick="getBusPosition"
-        android:text="Search" />
+        android:onClick="searchInbound"
+        android:text="Search Inbound" />
+
+    <Button
+        android:id="@+id/searchOutboundButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:onClick="searchOutbound"
+        android:text="Search Outbound" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/tv_stop_name"
+        android:text="TextView" />
 
     <fragment xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:map="http://schemas.android.com/apk/res-auto"

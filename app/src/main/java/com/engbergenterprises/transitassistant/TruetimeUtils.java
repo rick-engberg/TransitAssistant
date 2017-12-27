@@ -13,10 +13,10 @@ import java.util.Scanner;
 /**
  * These utilities will be used to communicate with the network.
  */
-public class NetworkUtils {
+public class TruetimeUtils {
 
-    final static String TRUETIME_BASE_URL =
-            "http://realtime.portauthority.org/bustime/api/v1/getvehicles";
+    //final static String TRUETIME_BASE_URL = "http://realtime.portauthority.org/bustime/api/v1/getvehicles";
+    final static String TRUETIME_BASE_URL = "http://realtime.portauthority.org/bustime/api/v1/getvehicles";
 
     final static String PARAM_QUERY = "rt";
 
@@ -29,13 +29,26 @@ public class NetworkUtils {
     final static String PARAM_FORMAT = "format";
     final static String format = "json";
 
-    /**
-     * Builds the URL used to query GitHub.
-     *
-     * @param routeSearch The keyword that will be queried for.
-     * @return The URL to use to query the GitHub.
-     */
-    public static URL buildUrl(String routeSearch) {
+    public static URL buildUrl(String function, String searchParam, String searchVal, String direction) {
+        Uri builtUri = Uri.parse(TRUETIME_BASE_URL).buildUpon()
+                .appendPath(function)
+                .appendQueryParameter(searchParam, searchVal)
+                .appendQueryParameter("dir", direction)
+                .appendQueryParameter(PARAM_KEY, key)
+                .appendQueryParameter(PARAM_FORMAT, format)
+                .build();
+
+        URL url = null;
+        try {
+            url = new URL(builtUri.toString());
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
+
+        return url;
+    }
+
+    public static URL buildUrlOld(String routeSearch) {
         Uri builtUri = Uri.parse(TRUETIME_BASE_URL).buildUpon()
                 .appendQueryParameter(PARAM_QUERY, routeSearch)
                 .appendQueryParameter(PARAM_KEY, key)

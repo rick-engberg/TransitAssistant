@@ -1,16 +1,22 @@
 package com.engbergenterprises.transitassistant;
 
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.os.AsyncTask;
 import android.os.Handler;
+import android.os.IBinder;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ProgressBar;
-import android.widget.TextView;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
@@ -25,7 +31,7 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.net.URL;
-import java.util.Locale;
+import java.util.Iterator;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
 
@@ -36,7 +42,27 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private Marker busMarker;
     static boolean primed = false;
     private long updates = 0;
+    private String direction;
+    private LocationService locater;
+    private boolean bound = false;
+    private LatLng location;
+    private String stopsQueryResponse;
 
+    private final int PERMISSION_REQUEST_CODE = 698;
+    private final int NOTIFICATION_ID = 423;
+
+    private ServiceConnection connection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName componentName, IBinder binder) {
+            LocationService.LocationBinder LocationBinder = (LocationService.LocationBinder) binder;
+            locater = LocationBinder.getLocater();
+            bound = true;
+        }
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+            bound = false;
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,7 +75,27 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mLoadingIndicator = (ProgressBar) findViewById(R.id.pb_loading_indicator);
         mSearchBoxEditText = (EditText) findViewById(R.id.et_search_box);
     }
-// NEW CODE START**
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (ContextCompat.checkSelfPermission(this, LocationService.PERMISSION_STRING)!= PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{LocationService.PERMISSION_STRING},PERMISSION_REQUEST_CODE);
+        } else {
+            Intent intent = new Intent(this, LocationService.class);
+            bindService(intent, connection, Context.BIND_AUTO_CREATE);
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (bound) {
+            unbindService(connection);
+            bound = false;
+        }
+    }
+
     private void updatePositionHandler() {
         Log.d("***DEBUG***","updatePositionHandler started");
         final GoogleMap mMapUp = mMap;
@@ -61,19 +107,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             updateMap();
             handler.postDelayed(this, 60000);
             }
-        });    }
-// NEW CODE **END
+        });
+    }
 
-
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
@@ -82,19 +118,58 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         LatLng sydney = new LatLng(-34, 151);
         LatLng eastCarsonBirminghamBridge = new LatLng(40.4284087647783,-79.97431994499044);
         busMarker = mMap.addMarker(new MarkerOptions().position(eastCarsonBirminghamBridge).title("East Carson St @ Birmingham Bridge"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(eastCarsonBirminghamBridge,15));
+        if (bound && locater !=null) {
+            location = locater.getLocation();
+            busMarker = mMap.addMarker(new MarkerOptions().position(location).title("Current Location"));
+            busMarker.setPosition(location);
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location,15));
+        } else {
+            busMarker = mMap.addMarker(new MarkerOptions().position(eastCarsonBirminghamBridge).title("East Carson St @ Birmingham Bridge"));
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(eastCarsonBirminghamBridge,15));
+        }
         mMap.animateCamera(CameraUpdateFactory.zoomIn());
         mMap.animateCamera(CameraUpdateFactory.zoomTo(15),2000,null);
     }
 
+    public void showClosestStop(View view) {
+        JSONObject currentStop;
+        JSONObject bestStop;
+        String route = mSearchBoxEditText.getText().toString();
+        URL stopsURL = TruetimeUtils.buildUrl("getstops", "rt", route, direction);
+        new ClosestStopTask().execute(stopsURL);
+        try {
+            JSONObject bustimeResponse = new JSONObject(stopsQueryResponse);
+            Iterator<String> iter = bustimeResponse.keys();
+            while (iter.hasNext()) {
+                currentStop = new JSONObject(iter.next());
+                // Need to convert truetime XML response to JSON
+                Log.d("*** STOP ***",(String)currentStop.get("stopnm"));
+            }
+        } catch (Exception e) {
+            Log.d("*** EXCEPTION ***",e.toString());
+        }
+    }
+
     public void getBusPosition(View view) {
-        String busQuery = mSearchBoxEditText.getText().toString();
-        URL busSearchURL = NetworkUtils.buildUrl(busQuery);
+        String route = mSearchBoxEditText.getText().toString();
+        URL busSearchURL = TruetimeUtils.buildUrl("getvehicles", "rt", route, direction);
         new BusQueryTask().execute(busSearchURL);
         if (!primed) {
             updatePositionHandler();
             primed = true;
         }
+    }
+
+    public void searchInbound(View view) {
+        direction = "INBOUND";
+        showClosestStop(view);
+        getBusPosition(view);
+    }
+
+    public void searchOutbound(View view) {
+        direction = "OUTBOUND";
+        showClosestStop(view);
+        getBusPosition(view);
     }
 
     public void updateMap() {
@@ -121,7 +196,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             JSONObject bus = (JSONObject) vehicles.get(0);
             String vid = bus.getString("vid");
             String rt = bus.getString("rt");
-            return "Route = "+rt+", VID="+vid+", updates="+updates++;
+            return "Route = "+rt+", VID="+vid+", updates="+updates+++", "+direction;
         } catch (Exception e) {
             Log.e("Exception",e.getMessage());
             return "error";
@@ -143,9 +218,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             return lat;
         } catch (Exception e) {
             Log.e("Exception",e.getMessage());
-            return -34;
+            return -34; // return latitude for Sydney, Australia
         }
-
     }
 
     public double getLon(String busQueryResponse) {
@@ -162,9 +236,40 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             return lon;
         } catch (Exception e) {
             Log.e("Exception",e.getMessage());
-            return 151;
+            return 151; // return longitude for Sydney, Australia
+        }
+    }
+
+    public class ClosestStopTask extends AsyncTask<URL, Void, String> {
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            mLoadingIndicator.setVisibility(View.VISIBLE);
         }
 
+        @Override
+        protected String doInBackground(URL... params) {
+            URL searchUrl = params[0];
+            String stopSearchResults = null;
+            try {
+                stopSearchResults = TruetimeUtils.getResponseFromHttpUrl(searchUrl);
+                location = locater.getLocation();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return stopSearchResults;
+        }
+
+        @Override
+        protected void onPostExecute(String stopSearchResults) {
+            mLoadingIndicator.setVisibility(View.INVISIBLE);
+            if (stopSearchResults != null && !stopSearchResults.equals("")) {
+                stopsQueryResponse = stopSearchResults;
+            } else {
+                //showErrorMessage();
+            }
+        }
     }
 
     public class BusQueryTask extends AsyncTask<URL, Void, String> {
@@ -181,7 +286,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             URL searchUrl = params[0];
             String busSearchResults = null;
             try {
-                busSearchResults = NetworkUtils.getResponseFromHttpUrl(searchUrl);
+                busSearchResults = TruetimeUtils.getResponseFromHttpUrl(searchUrl);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -190,7 +295,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         @Override
         protected void onPostExecute(String busSearchResults) {
-            // COMPLETED (27) As soon as the loading is complete, hide the loading indicator
             mLoadingIndicator.setVisibility(View.INVISIBLE);
             if (busSearchResults != null && !busSearchResults.equals("")) {
                 busQueryResponse = busSearchResults;
