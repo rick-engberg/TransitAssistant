@@ -2,7 +2,7 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 26
-    buildToolsVersion "26.0.0"
+    //buildToolsVersion "26.0.0" // commented out since default tools will be used
     defaultConfig {
         applicationId "com.engbergenterprises.transitassistant"
         minSdkVersion 19
@@ -27,4 +27,5 @@ dependencies {
     compile 'com.android.support:appcompat-v7:26.+'
     compile 'com.google.android.gms:play-services-maps:11.0.4'
     testCompile 'junit:junit:4.12'
+    compile 'com.github.smart-fun:XmlToJson:1.1.1'
 }

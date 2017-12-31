@@ -35,7 +35,7 @@ public class TruetimeUtils {
                 .appendQueryParameter(searchParam, searchVal)
                 .appendQueryParameter("dir", direction)
                 .appendQueryParameter(PARAM_KEY, key)
-                .appendQueryParameter(PARAM_FORMAT, format)
+                // .appendQueryParameter(PARAM_FORMAT, format) // commented out because TrueTime API does not consistently return JSON
                 .build();
 
         URL url = null;

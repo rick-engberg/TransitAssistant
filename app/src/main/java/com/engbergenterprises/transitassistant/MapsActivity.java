@@ -28,10 +28,13 @@ import com.google.android.gms.maps.model.MarkerOptions;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.json.XML;
 
 import java.io.IOException;
 import java.net.URL;
 import java.util.Iterator;
+
+import fr.arnaudguyon.xmltojsonlib.XmlToJson;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
 
@@ -131,7 +134,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.animateCamera(CameraUpdateFactory.zoomTo(15),2000,null);
     }
 
-    public void showClosestStop(View view) {
+    public void getClosestStop(View view) {
         JSONObject currentStop;
         JSONObject bestStop;
         String route = mSearchBoxEditText.getText().toString();
@@ -150,6 +153,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
+    public void displayClosestStop(View view) {
+
+    }
+
     public void getBusPosition(View view) {
         String route = mSearchBoxEditText.getText().toString();
         URL busSearchURL = TruetimeUtils.buildUrl("getvehicles", "rt", route, direction);
@@ -162,13 +169,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     public void searchInbound(View view) {
         direction = "INBOUND";
-        showClosestStop(view);
+        getClosestStop(view);
         getBusPosition(view);
     }
 
     public void searchOutbound(View view) {
         direction = "OUTBOUND";
-        showClosestStop(view);
+        getClosestStop(view);
         getBusPosition(view);
     }
 
@@ -297,7 +304,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         protected void onPostExecute(String busSearchResults) {
             mLoadingIndicator.setVisibility(View.INVISIBLE);
             if (busSearchResults != null && !busSearchResults.equals("")) {
-                busQueryResponse = busSearchResults;
+                //busQueryResponse = busSearchResults;
+                XmlToJson xmlToJson = new XmlToJson.Builder(busSearchResults).build();
+                busQueryResponse = xmlToJson.toString();
                 updateMap();
             } else {
                 //showErrorMessage();
